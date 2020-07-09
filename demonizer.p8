@@ -233,6 +233,7 @@ local function player_vs_bullet(id,bid)
  end
  player_id=nil
  expire_timers[id]=0
+ shoot_timers[id]=nil
  sfx(3,sch_player)
 
  local s=sprs[id]
@@ -245,8 +246,6 @@ local function player_vs_bullet(id,bid)
 end
 
 local function update_player(id)
- collide_group(id,bullet_ids,
-  1<<flag_ai,player_vs_bullet)
  local s=sprs[id]
  local x,y=s.x,s.y
  if btn(⬅️) then x=x - 2 end
@@ -267,6 +266,8 @@ local function update_player(id)
  else
   shoot_timers[id]=shoot_t - 1
  end
+ collide_group(id,bullet_ids,
+  1<<flag_ai,player_vs_bullet)
  update_anim(s)
 end
 
@@ -280,6 +281,7 @@ local function ai_vs_bullet
  score=score + 50
  sfx(0x01,sch_ai)
  expire_timers[id]=0
+ shoot_timers[id]=nil
  expire_timers[bid]=-1
 end
 
@@ -291,9 +293,6 @@ local function in_battle_space(s)
 end
 
 local function update_ai(id)
- collide_group(id,bullet_ids,
-  1<<flag_player,ai_vs_bullet)
-
  local s=sprs[id]
 
  if player_id
@@ -315,6 +314,8 @@ local function update_ai(id)
   end
  end
  s.y=s.y + stage_speed
+ collide_group(id,bullet_ids,
+  1<<flag_player,ai_vs_bullet)
  update_anim(s)
  if not spr_onscreen(s) then
   expire_timers[id]=0
