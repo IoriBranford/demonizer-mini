@@ -165,7 +165,7 @@ end
 -----------[[ game ]]-----------
 
 local unit_ids
-local shoot_timers
+local unit_vars
 local bullet_ids
 local stage_progress
 local stage_speed
@@ -191,7 +191,7 @@ local function update_bullets
 (bullet_ids)
  for id in all(bullet_ids) do
   local s=sprs[id]
-  expire_timers[id]=expire_timers[id] - 1
+  expire_timers[id]=expire_timers[id]-1
   s.x=s.x + s.vx
   s.y=s.y + s.vy
   update_anim(s)
@@ -216,24 +216,30 @@ local function update_units
  del_expired(unit_ids)
 end
 
+local function kill_bullet(id)
+ expire_timers[id]=-1
+end
+
 local function new_unit
-(tile,x,y,fct,ft,shoot_t,upd)
+(tile,x,y,fct,ft,vars,upd)
  local id=new_id()
  local s=new_sprite(id,tile,x,y)
- shoot_timers[id]=shoot_t
+ unit_vars[id]=vars
  start_anim(s,fct,ft)
  add_update(id,upd)
  add(unit_ids,id)
  return id
 end
 
+local function kill_unit(id)
+ expire_timers[id]=0
+ unit_vars[id]=nil
+end
+
 local function player_vs_bullet(id,bid)
  if not player_id then
   return
  end
- player_id=nil
- expire_timers[id]=0
- shoot_timers[id]=nil
  sfx(3,sch_player)
 
  local s=sprs[id]
@@ -242,7 +248,9 @@ local function player_vs_bullet(id,bid)
  local deathspr=sprs[death]
  start_anim(deathspr,3,6)
 
- expire_timers[bid]=0
+ kill_unit(id)
+ kill_bullet(bid)
+ player_id=nil
 end
 
 local function update_player(id)
@@ -255,16 +263,17 @@ local function update_player(id)
  x=max(0,min(x,120))
  y=max(0,min(y,120))
  s.x,s.y=x,y
- local shoot_t = shoot_timers[id]
- if shoot_t <= 0 then
+ local vars=unit_vars[id]
+ local shoot_t=vars.shoot_timer
+ if shoot_t<=0 then
   if btn(🅾️) then
    new_bullet(0x43,x,y,0,-8,
     30)
    sfx(0,sch_player)
-   shoot_timers[id]=6
+   vars.shoot_timer=6
   end
  else
-  shoot_timers[id]=shoot_t - 1
+  vars.shoot_timer=shoot_t-1
  end
  collide_group(id,bullet_ids,
   1<<flag_ai,player_vs_bullet)
@@ -277,12 +286,10 @@ local function ai_vs_bullet
  or expire_timers[bid]<0 then
   return
  end
- local s=sprs[id]
  score=score + 50
  sfx(0x01,sch_ai)
- expire_timers[id]=0
- shoot_timers[id]=nil
- expire_timers[bid]=-1
+ kill_unit(id)
+ kill_bullet(bid)
 end
 
 local function in_battle_space(s)
@@ -297,12 +304,13 @@ local function update_ai(id)
 
  if player_id
  and in_battle_space(s) then
-  local shoot_t = shoot_timers[id]
-  if shoot_t <= 0 then
-   shoot_timers[id]=60
+  local vars=unit_vars[id]
+  local shoot_t=vars.shoot_timer
+  if shoot_t<=0 then
+   vars.shoot_timer=60
    local player=sprs[player_id]
-   local dx=player.x - s.x
-   local dy=player.y - s.y
+   local dx=player.x-s.x
+   local dy=player.y-s.y
    local dist=sqrt(dx*dx + dy*dy)
    local speed=2/dist
    dx=dx*speed
@@ -310,7 +318,7 @@ local function update_ai(id)
    new_bullet(80,s.x,s.y,
     dx,dy,90)
   else
-   shoot_timers[id]=shoot_t - 1
+   vars.shoot_timer=shoot_t-1
   end
  end
  s.y=s.y + stage_speed
@@ -331,8 +339,11 @@ local function spawn_top_row
   local tile=mget(spawn_col,
    top_row)
   if fget(tile,flag_ai) then
+   local vars={
+    shoot_timer=60
+   }
    new_unit(tile,x,-8,2,6,
-    60,update_ai)
+    vars,update_ai)
   end
   spawn_col=spawn_col + 1
  end
@@ -363,10 +374,13 @@ local function init_play()
  init_core()
  unit_ids={}
  bullet_ids={}
- shoot_timers={}
+ unit_vars={}
 
+ local vars={
+  shoot_timer=0
+ }
  player_id=new_unit(0x40,
-  60,112,3,6,0,
+  60,112,3,6,vars,
   update_player)
 
  stage_speed=0.5
